@@ -188,6 +188,34 @@ object WorkspaceFileTool {
 
     // ── actions ──
 
+    /**
+     * 逆核: 把本地文件流式复制进工作区（自动建父目录，沙箱路径校验），不占用双倍内存。
+     * 供脱壳等工具把产物归档到用户指定的工作区文件夹（如 脱壳_<时间戳>/dump_0.dex）。
+     */
+    internal fun copyFileIn(resolver: ContentResolver, treeUri: Uri, relativePath: String, src: java.io.File) {
+        val parts = normalize(relativePath)
+            ?: throw IllegalArgumentException("路径不合法：只允许工作区内的相对路径（拒绝绝对路径 / .. / 盘符）")
+        if (parts.isEmpty()) throw IllegalArgumentException("copyFileIn 需要一个文件路径")
+        val name = parts.last()
+        val parentUri = resolve(resolver, treeUri, parts.dropLast(1), createDirs = true)
+            ?: throw IllegalArgumentException("无法在工作区创建父目录")
+        val existing = findChild(resolver, treeUri, parentUri, name)
+        val docUri = existing
+            ?: DocumentsContract.createDocument(resolver, parentUri, guessMime(name), name)
+            ?: throw IllegalArgumentException("无法在工作区创建文件: $relativePath")
+        resolver.openOutputStream(docUri, "wt").use { out ->
+            requireNotNull(out) { "无法打开工作区写入流: $relativePath" }
+            src.inputStream().use { ins ->
+                val buffer = ByteArray(64 * 1024)
+                while (true) {
+                    val n = ins.read(buffer)
+                    if (n < 0) break
+                    out.write(buffer, 0, n)
+                }
+            }
+        }
+    }
+
     private fun list(resolver: ContentResolver, treeUri: Uri, path: String): JSONObject {
         val parts = normalize(path)
             ?: return err("INVALID_PATH", "路径不合法：只允许工作区内的相对路径（拒绝绝对路径 / .. / 盘符）", "path", path)
