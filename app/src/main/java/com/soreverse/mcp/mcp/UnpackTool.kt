@@ -92,7 +92,8 @@ object UnpackTool {
                     // 逆核: 脱壳产物归档到受限工作区「脱壳_<时间戳>」子文件夹(复用 workspace_fs 沙箱写入)；
                     // 工作区未启用时保持原行为(产物留私有目录)并给出提示。
                     val ws = ctx.settings
-                    if (ws.workspaceEnabled && ws.workspaceUri != null) {
+                    val wsUri = ws.workspaceUri
+                    if (ws.workspaceEnabled && wsUri != null) {
                         val dirName = "脱壳_" + SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date())
                         val copied = JSONArray()
                         val errors = JSONArray()
@@ -100,7 +101,7 @@ object UnpackTool {
                             val src = File(outDir, name)
                             if (src.isFile) {
                                 runCatching {
-                                    WorkspaceFileTool.copyFileIn(ctx.context.contentResolver, ws.workspaceUri, "$dirName/$name", src)
+                                    WorkspaceFileTool.copyFileIn(ctx.context.contentResolver, wsUri, "$dirName/$name", src)
                                 }.onSuccess { copied.put("$dirName/$name") }
                                 .onFailure { errors.put("$dirName/$name: ${it.message}") }
                             }
