@@ -23,6 +23,21 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "9.6.1"
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager "platforms;android-36" "build-tools;36.0.0"
+      # 逆核: 同 build-apk.yml——android-actions/setup-android 在 runner 上接受 license 会
+      # 交互式卡住并 exit 1，改为手动装 SDK 组件并接受协议。
+      - name: Set up Android SDK
+        run: |
+          set -e
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          CT="$SDK/cmdline-tools/16.0"
+          if [ ! -x "$CT/bin/sdkmanager" ]; then
+            curl -fsSL -o /tmp/clt.zip https://dl.google.com/android/repository/commandlinetools-linux-12266719_latest.zip
+            unzip -q /tmp/clt.zip -d /tmp/clt
+            mkdir -p "$CT"
+            mv /tmp/clt/cmdline-tools/* "$CT/"
+          fi
+          SM="$CT/bin/sdkmanager"
+          yes | "$SM" --licenses > /dev/null 2>&1 || true
+          "$SM" "platforms;android-36" "build-tools;36.0.0"
+          echo "sdk.dir=$SDK" > local.properties
       - run: gradle :app:testDebugUnitTest --stacktrace
