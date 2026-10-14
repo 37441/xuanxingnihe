@@ -45,8 +45,9 @@ jobs:
 
       # 逆核: 只出 arm64-v8a 的 debug 包。release 需要本地签名文件(release/*.jks)，
       # 仓库未含，故统一构建 assembleDebug。产物可直接安装。
+      # gradlew 在仓库里无执行位（工作区无法 chmod），统一用 bash 解释执行。
       - name: Build debug APK (arm64)
-        run: ./gradlew :app:assembleDebug --stacktrace
+        run: bash ./gradlew :app:assembleDebug --stacktrace
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
