@@ -5,6 +5,7 @@ import com.android.tools.smali.baksmali.Baksmali
 import com.android.tools.smali.baksmali.BaksmaliOptions
 import com.android.tools.smali.dexlib2.DexFileFactory
 import com.android.tools.smali.dexlib2.Opcodes
+import com.soreverse.mcp.core.FileInWorkspaceResolver
 import com.soreverse.mcp.core.err
 import com.soreverse.mcp.core.ok
 import com.soreverse.mcp.core.str
@@ -38,8 +39,9 @@ object StaticTools {
         override fun handle(ctx: ToolContext, args: JSONObject): JSONObject {
             val inputPath = args.str("path").ifBlank { args.str("filePath") }
             if (inputPath.isBlank()) return err("INVALID_ARGUMENT", "缺少参数 path(DEX 路径)", "path", "")
-            val input = File(inputPath)
-            if (!input.isFile) return err("FILE_NOT_FOUND", "文件不存在: $inputPath", "path", inputPath)
+            // 逆核: scoped storage 适配——工作区/工作目录内的文件经 SAF 解析成私有缓存再反汇编
+            val input = FileInWorkspaceResolver.resolve(ctx.context, ctx.settings, inputPath)
+            if (input == null) return err("FILE_NOT_ACCESSIBLE", "无法读取 DEX 文件: $inputPath（请把文件放进工作区/工作目录后再试）", "path", inputPath)
 
             return runCatching {
                 val api = args.intValue("apiLevel", 0)
@@ -86,8 +88,9 @@ object StaticTools {
         override fun handle(ctx: ToolContext, args: JSONObject): JSONObject {
             val inputPath = args.str("path").ifBlank { args.str("filePath") }
             if (inputPath.isBlank()) return err("INVALID_ARGUMENT", "缺少参数 path(APK 路径)", "path", "")
-            val input = File(inputPath)
-            if (!input.isFile) return err("FILE_NOT_FOUND", "文件不存在: $inputPath", "path", inputPath)
+            // 逆核: scoped storage 适配——工作区/工作目录内的文件经 SAF 解析成私有缓存再解析
+            val input = FileInWorkspaceResolver.resolve(ctx.context, ctx.settings, inputPath)
+            if (input == null) return err("FILE_NOT_ACCESSIBLE", "无法读取 APK 文件: $inputPath（请把文件放进工作区/工作目录后再试）", "path", inputPath)
 
             return runCatching {
                 val apk = ApkModule.loadApkFile(input)

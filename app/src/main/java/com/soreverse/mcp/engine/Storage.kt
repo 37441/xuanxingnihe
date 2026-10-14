@@ -126,6 +126,9 @@ class WorkDirectory(private val context: Context, private val treeUri: Uri) {
         return readBytes(found ?: error("File not found in work directory: $relativePath"), maxBytes)
     }
 
+    /** 逆核: 直接按授权树内的文档 URI 读取字节（供 engine 侧 path=content:// 输入用）。 */
+    fun readDocument(uri: Uri, maxBytes: Long = Long.MAX_VALUE): ByteArray = readBytes(uri, maxBytes)
+
     fun writeRootFile(displayName: String, bytes: ByteArray, mimeType: String = "application/octet-stream"): SoSource {
         val safeName = displayName.substringAfterLast('/').substringAfterLast('\\').ifBlank { "downloaded.so" }
         val parent = documentUriForTree()

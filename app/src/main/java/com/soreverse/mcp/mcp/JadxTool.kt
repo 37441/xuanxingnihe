@@ -1,5 +1,6 @@
 package com.soreverse.mcp.mcp
 
+import com.soreverse.mcp.core.FileInWorkspaceResolver
 import com.soreverse.mcp.core.err
 import com.soreverse.mcp.core.ok
 import com.soreverse.mcp.core.str
@@ -64,9 +65,11 @@ object JadxTool {
             if (inputPath.isBlank()) {
                 return err("INVALID_ARGUMENT", "缺少参数 path(APK/DEX/JAR 路径)", "path", "")
             }
-            val input = File(inputPath)
-            if (!input.isFile) {
-                return err("FILE_NOT_FOUND", "文件不存在: $inputPath", "path", inputPath)
+            // 逆核: scoped storage 下用真实路径读不了外部存储,统一经 SAF 把工作区/工作目录内的
+            // 文件解析成私有缓存文件(FileInWorkspaceResolver);不在授权范围内则拒绝。
+            val input = FileInWorkspaceResolver.resolve(ctx.context, ctx.settings, inputPath)
+            if (input == null) {
+                return err("FILE_NOT_ACCESSIBLE", "无法读取输入文件: $inputPath（请把文件放进工作区/工作目录后再试）", "path", inputPath)
             }
             val appCache = ctx.context.cacheDir
             val action = args.str("action", "save").ifBlank { "save" }

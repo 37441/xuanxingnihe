@@ -98,7 +98,28 @@ internal fun EngineRuntime.analyzeApk(path: String, entryLimit: Int = 500): JSON
     val local = File(path)
     if (local.isFile && local.length() > ApkAnalyzer.MAX_INPUT_BYTES) return@guarded err("APK_LIMIT_EXCEEDED", "APK exceeds ${ApkAnalyzer.MAX_INPUT_BYTES / 1024 / 1024} MiB input limit", "path", path)
     val bytes = try {
-        if (local.isFile) local.readBytes() else (workDir ?: return@guarded err("WORK_DIRECTORY_NOT_SELECTED", "APK path is not a local file and no work directory is selected", "path", path)).readFile(path, ApkAnalyzer.MAX_INPUT_BYTES)
+        if (local.isFile) {
+            local.readBytes()
+        } else {
+            val dir = workDir ?: return@guarded err("WORK_DIRECTORY_NOT_SELECTED", "APK path is not a local file and no work directory is selected", "path", path)
+            when {
+                // 逆核: scoped storage 适配——content:// 文档 URI 直接按授权树读
+                path.startsWith("content://") -> dir.readDocument(Uri.parse(path), ApkAnalyzer.MAX_INPUT_BYTES)
+                else -> {
+                    // 显示路径(/storage/emulated/0/...)或相对路径 → 转工作目录内相对路径
+                    val rel = workDirUri?.let { wu ->
+                        val prefix = WorkDirectory.displayPath(wu).trimEnd('/')
+                        when {
+                            path.startsWith(prefix) -> path.removePrefix(prefix).trim('/').ifBlank { null }
+                            !path.startsWith("/") -> path
+                            else -> null
+                        }
+                    }
+                    val relative = rel ?: return@guarded err("WORK_DIRECTORY_NOT_SELECTED", "APK 不在工作目录内，无法读取（请把 APK 放进工作目录/工作区）", "path", path)
+                    dir.readFile(relative, ApkAnalyzer.MAX_INPUT_BYTES)
+                }
+            }
+        }
     } catch (error: ApkAnalysisLimitException) {
         return@guarded err("APK_LIMIT_EXCEEDED", error.message ?: "APK exceeds analysis limits", "path", path)
     }
